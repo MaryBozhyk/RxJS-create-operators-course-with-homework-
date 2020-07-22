@@ -1,4 +1,4 @@
-import { Observable, of, from, fromEvent, generate, pairs, EMPTY, concat, timer, zip, range, bindCallback, bindNodeCallback, fromEventPattern, interval, NEVER, throwError, defer } from "rxjs";
+import { Observable, of, from, fromEvent, generate, pairs, EMPTY, concat, timer, zip, range, bindCallback, bindNodeCallback, fromEventPattern, interval, NEVER, throwError, defer, asyncScheduler } from "rxjs";
 import { map, take, tap, switchMap, filter, reduce, catchError, delay, concatMap, withLatestFrom } from "rxjs/operators";
 import { fromFetch } from "rxjs/fetch";
 import { ajax } from "rxjs/ajax";
@@ -8,7 +8,7 @@ import { addItem, run } from './../03-utils';
 // Реализуйте тело функции, которая принимает переменное количество параметров 
 // и создает Observable, который выдает значения ее аргументов
 (function task1(...rest: any[]): void {
-    // const stream$ = 
+    const stream$ = of(...rest);
 
     // run(stream$);
 })(1, 'string', true, {});
@@ -17,7 +17,7 @@ import { addItem, run } from './../03-utils';
 // Реализуйте тело функции, которая принимает на вход массив и создает Observable,
 // который выдает значения этого массива
 (function task2(arr: any[]): void {
-    // const stream$ = 
+    const stream$ = from(arr);
     
     // run(stream$);
 })([1, 'string', true, {}]);
@@ -32,8 +32,9 @@ import { addItem, run } from './../03-utils';
           yield Math.floor( Math.random() * ( max - min ) ) + min;
         }
       }
-      
-    // const stream$ = 
+    
+    const iterator = generator(0, 100);
+    const stream$ = from(iterator).pipe(take(10));
     
     // run(stream$);
 })();
@@ -42,7 +43,34 @@ import { addItem, run } from './../03-utils';
 // Реализуйте тело функции, которая принимает 
 // id кнопки и создает Observable, который выдает значения времени клика по кнопке
 (function task3(buttonId: string): void {
-    // const stream$ = 
+    const target = document.getElementById(buttonId);
+    const eventName = 'click';
+    const resultSelector = (event: any) => event.timeStamp;
+
+    const stream$ = fromEvent(target, eventName, resultSelector)
+
+     // My implementation with formatted time
+
+    // const currentTime = function() {
+    //     var today = new Date();
+    //     var hour = today.getHours();
+    //     var minnutes = today.getMinutes();
+    //     var seconds = today.getSeconds();
+    //     function checkTime(i) {
+    //         if (i < 10) {i = "0" + i};
+    //         return i;
+    //     }
+    //     minnutes = checkTime(minnutes);
+    //     seconds = checkTime(seconds);
+    //     return `${hour}:${minnutes}:${seconds}`; 
+    // }
+    
+    // const stream$ = fromEvent(target, eventName)
+    // .pipe(
+    //     switchMap((e: MouseEvent) => {
+    //       return of(currentTime());
+    //     })
+    // );
     
     // run(stream$);
 })('runBtn');
@@ -65,8 +93,8 @@ import { addItem, run } from './../03-utils';
 
     const foo = new С1();
 
-    // const stream$ = 
-
+    // const stream$ = fromEventPattern(foo.registerListener.bind(foo));
+    const stream$ = fromEventPattern(list => foo.registerListener(list))
     // run(stream$);
 
     foo.emit(1);
@@ -80,7 +108,32 @@ import { addItem, run } from './../03-utils';
 // Реализуйте функцию, которая создает Observable, который выдает имена пользователей. 
 // Используйте операторы: fromFetch('http://jsonplaceholder.typicode.com/users), filter(), switchMap(), map()
 (function task5() {
-    // const stream$ = 
+    const stream$ = fromFetch('http://jsonplaceholder.typicode.com/users')
+    .pipe(
+        filter(res => res.ok),
+        switchMap(response => {
+            return response.json();
+        }),
+        map(arr => arr.map(obj => obj.name)),
+        switchMap(arr => from(arr))
+    );
+
+    // My implementation
+    
+    // .pipe(
+    //     switchMap(response => {
+    //         if (response.ok) {
+    //             return response.json();
+    //         } else {
+    //             return of({ error: true, message: `Error ${response.status}` });
+    //         }
+    //     }),
+    //     switchMap(users => users.map(user => user.name)),
+    //     catchError(err => {
+    //         console.error(err);
+    //         return of({ error: true, message: err.message })
+    //     })
+    // );
 
     // run(stream$);
 })();
@@ -89,7 +142,20 @@ import { addItem, run } from './../03-utils';
 // Реализуйте функцию, которая создает Observable, который выдает имена ползователей. 
 // Используйте операторы: ajax('http://jsonplaceholder.typicode.com/users'), switchMap(), map()
 (function task6() {
-    // const stream$ =
+    const stream$ = ajax('http://jsonplaceholder.typicode.com/users')
+    .pipe( 
+        map(response => response.response), 
+        map(arr => arr.map(x=>x.name)), 
+        switchMap(arr2 => from(arr2)) 
+    )
+
+    // My implementation
+
+    // .pipe(
+    //     switchMap(el => {
+    //         return el.response.map(user => user.name)
+    //     }),
+    // )
 
     // run(stream$);
 })();
@@ -98,7 +164,13 @@ import { addItem, run } from './../03-utils';
 // Реализуйте функцию, которая создает Observable, который запрашивает и выдает имена ползователей каждые 5с 
 // Используйте операторы: ajax('http://jsonplaceholder.typicode.com/users'), switchMap(), map()
 (function task7() {
-    // const stream$ = 
+    const stream$ = interval(5000)
+    .pipe(
+        switchMap(time => ajax('http://jsonplaceholder.typicode.com/users')),
+        map(res => res.response), 
+        map(arr => arr.map(item => item.name)), 
+        switchMap(arr => from(arr)) 
+    )
 
     // run(stream$);
 })();
@@ -110,8 +182,10 @@ import { addItem, run } from './../03-utils';
 // Объедините эти потоки, используя zip
 (function task8() {
     const items = [1, 2, 3, 4, 5];
-    // const stream$ = 
-    
+    const stream$ = zip(        
+        from(items), 
+        timer(0, 2000)).pipe(map(([item, sec]) => item)
+    )
     // run(stream$);
 })();
 
@@ -126,7 +200,9 @@ import { addItem, run } from './../03-utils';
         return pause;
     }
 
-    // const stream$ = 
+    const stream$ =  range(1, 10).pipe(        
+        concatMap(range => of(range).pipe(delay(randomDelay(1000, 5000)))),
+    )   
 
     // run(stream$);
 })();
@@ -149,7 +225,17 @@ import { addItem, run } from './../03-utils';
 
     const  fieldsStream = from(['country', 'street', 'flat']);
 
-    // const stream$ = 
+    const stream$ = objAddressStream
+    .pipe(
+        switchMap(obj => {
+            return pairs(obj)
+        }),
+        withLatestFrom(fieldsStream.pipe(
+            reduce((acc, val) => { acc.push(val); return acc }, [])
+        )),
+        filter(([el, fields]) => fields.includes(el[0])),
+        reduce((acc, [value]) => { return {...acc, [value[0]]: value[1]} }, {})
+    )
     
     // run(stream$); 
 })();
@@ -162,7 +248,15 @@ import { addItem, run } from './../03-utils';
 (function task11() {
     const items = [1, 2, 3, 4, 5];
 
-    // const stream$ = 
+    const stream$ =  from(items)
+    .pipe(
+        concatMap(item => {
+            return concat(
+                of(item), 
+                EMPTY.pipe(delay(2000))              
+            )
+        })
+    )
 
     // run(stream$);
 })();
@@ -174,7 +268,10 @@ import { addItem, run } from './../03-utils';
 (function task11() {
     const items = [1, 2, 3, 4, 5];
 
-    // const stream$ = 
+    const stream$ = concat(        
+        from(items),
+        NEVER
+    )
 
     // run(stream$);
 })();
@@ -185,7 +282,15 @@ import { addItem, run } from './../03-utils';
 (function task11() {
     const items = [1, 2, 3, 4, 5];
 
-    // const stream$ = 
+    const stream$ = from(items).pipe(
+        switchMap(item => {
+            if (item === 3) {
+                return throwError(new Error(`Invalid value!`))
+            } else {
+                return of(item)
+            }
+        })
+    );
 
     // run(stream$);
 })();
@@ -202,7 +307,7 @@ import { addItem, run } from './../03-utils';
         }, 3000);
     }
 
-    
+    const reactiveDoAsyncJob = bindCallback(doAsyncJob);
 
     // const stream$ = reactiveDoAsyncJob({ name: 'Anna' });
 
@@ -221,7 +326,8 @@ import { addItem, run } from './../03-utils';
             callback('Error', data)
         }, 3000);
     }
-
+    
+    const reactiveDoAsyncJob = bindNodeCallback(doAsyncJob);
 
     // const stream$ = reactiveDoAsyncJob({ name: 'Anna' });
 
@@ -241,7 +347,7 @@ import { addItem, run } from './../03-utils';
     // getUsers().then(data => data.json()).then(addItem);
 
 
-    // const stream$ = 
+    // const stream$ = defer(() => getUsers()).pipe(switchMap(data => data.json()));
 
     // addItem("I don't want that request now");
     // run(stream$);
@@ -272,10 +378,72 @@ import { addItem, run } from './../03-utils';
 
     const sequence = new C<number>().add(1).add(10).add(1000).add(10000);
 
-    // const stream$ = 
+    const stream$ = generate(0, i => i < sequence.size, i => i + 1, i => sequence.get(i)) 
 
     // run(stream$);
 })();
 
+
+//My tasks
+// Task1
+// Реализувати функцію, яка видає імена користувачів, однак, у випадку, якщо username містить більше ніж 15 символів видає помилку.
+(function myTask1() {
+    const stream$ = ajax('http://jsonplaceholder.typicode.com/users')
+    .pipe( 
+        map(response => response.response), 
+        map(arr => arr.map(x=>[x.name, x.username])),
+        switchMap(arr => from(arr)),
+        switchMap(([name, username]) => {
+            if (username.length > 15) {
+                return throwError(new Error(`The username is too long!`))
+            } else {
+                return of(name)
+            }
+        })
+    )
+
+    // run(stream$);
+})();
+
+// Task2
+// Релізувати функцію, яка при кліку на кнопку здійснює запит на сервер і видає через 3с. ім'я рандомного юзера.
+(function myTask2(buttonId: string): void {
+    const target = document.getElementById(buttonId);
+    const eventName = 'click';
+    function randomUser() {
+        const randomUserId = Math.floor(Math.random() * 10) + 1;
+        console.log(randomUserId)
+        return randomUserId;
+    }
+
+    const stream$ = fromEvent(target, eventName)
+    .pipe(
+        switchMap((e: MouseEvent) => {            
+          return of(randomUser());
+        }),
+        withLatestFrom(ajax('http://jsonplaceholder.typicode.com/users').pipe(map(response => response.response))),
+        map(([userId, arr]) => arr.filter(user => user.id === userId)),
+        switchMap(arr => from(arr.map(user => user.name))),
+        delay(3000)
+    );
+    
+    // run(stream$);
+})('runBtn');
+
+// Task 3
+// Cтворити Observable, який генерує значення від 3 до 100 з кроком 2 і видає 'Yes', якщо значення кратне 3, а в іншому випадку 'No'.
+(function myTask3() {
+    const handleProcess = {
+     initialState: 3,
+     condition: (value: number) => value <= 100,
+     iterate: (value: number) => value + 2,
+     resultSelector: (value: number) => value%3 ? 'No' : 'Yes',
+     scheduler: asyncScheduler
+    };
+    
+    const stream$ = generate(handleProcess);
+    
+    // run(stream$);
+})()
 
 export function runner() {}
